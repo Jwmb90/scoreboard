@@ -2,5 +2,4 @@ Flask
 Flask-SQLAlchemy
 selenium
 beautifulsoup4
-Flask==<your_flask_version>
 gunicorn
