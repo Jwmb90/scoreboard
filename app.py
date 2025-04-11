@@ -5,10 +5,12 @@ from datetime import datetime, timedelta
 import time
 
 app = Flask(__name__)
+# Configure the SQLite database (stored in competitors.db)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///competitors.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
+# Expose timedelta to Jinja templates for UTC+1 time adjustment
 app.jinja_env.globals['timedelta'] = timedelta
 
 # ----------------------
@@ -40,6 +42,7 @@ class MasterScoreHistory(db.Model):
 # Helper Functions
 # ----------------------
 def update_master_scores(scraped, now=None):
+    """Update MasterScore records and log changes to history."""
     if now is None:
         now = datetime.utcnow()
     for entry in scraped:
@@ -61,7 +64,12 @@ def update_master_scores(scraped, now=None):
     db.session.commit()
 
 def generate_scoreboard():
-    leaderboard_mapping = get_leaderboard_mapping_cached()
+    """
+    For each competitor, look up their selected golfers' scores using the cached data.
+    Returns a list of dictionaries with competitor data and formatted total score,
+    sorted in ascending order based on numeric total.
+    """
+    leaderboard_mapping = get_leaderboard_mapping_cached()  # {golfer: score, ...}
     scoreboard = []
     competitors = Competitor.query.all()
     for comp in competitors:
@@ -96,6 +104,7 @@ def generate_scoreboard():
     return scoreboard
 
 def get_full_masters_scoreboard():
+    """Returns all MasterScore records sorted by numeric value (treating 'E' as 0)."""
     all_scores = MasterScore.query.all()
     def convert_score(score_str):
         s = score_str.strip()
@@ -159,7 +168,7 @@ def edit_competitor(competitor_id):
 
 @app.route("/refresh")
 def refresh():
-    scraped = force_refresh_leaderboard()
+    scraped = force_refresh_leaderboard()  # Force a fresh scrape and update cache
     update_master_scores(scraped)
     return redirect(url_for("index"))
 
@@ -173,12 +182,14 @@ def api_competition():
 
 @app.route("/api/full")
 def api_full():
+    # Optionally force a refresh if the cache is expired.
     if time.time() - get_leaderboard_mapping_cached().get('_last_scrape', 0) > CACHE_DURATION:
         scraped = force_refresh_leaderboard()
         update_master_scores(scraped)
     full = get_full_masters_scoreboard()
     result = []
     for entry in full:
+        # Adjust last_updated to UTC+1
         adjusted_time = entry.last_updated + timedelta(hours=1)
         result.append({
             "golfer": entry.golfer,
