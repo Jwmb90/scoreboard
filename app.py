@@ -5,12 +5,10 @@ from datetime import datetime, timedelta
 import time
 
 app = Flask(__name__)
-# Configure the SQLite database (stored in competitors.db)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///competitors.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# Expose timedelta to Jinja for UTC+1 conversion in templates
 app.jinja_env.globals['timedelta'] = timedelta
 
 # ----------------------
@@ -42,9 +40,6 @@ class MasterScoreHistory(db.Model):
 # Helper Functions
 # ----------------------
 def update_master_scores(scraped, now=None):
-    """
-    Update MasterScore records and log changes in MasterScoreHistory.
-    """
     if now is None:
         now = datetime.utcnow()
     for entry in scraped:
@@ -66,12 +61,7 @@ def update_master_scores(scraped, now=None):
     db.session.commit()
 
 def generate_scoreboard():
-    """
-    For each competitor, look up their selected golfers' scores using cached data.
-    Returns a list of dictionaries with competitor data and formatted total scores.
-    Sorted in ascending order based on the numeric total.
-    """
-    leaderboard_mapping = get_leaderboard_mapping_cached()  # {golfer: score, ...}
+    leaderboard_mapping = get_leaderboard_mapping_cached()
     scoreboard = []
     competitors = Competitor.query.all()
     for comp in competitors:
@@ -106,9 +96,6 @@ def generate_scoreboard():
     return scoreboard
 
 def get_full_masters_scoreboard():
-    """
-    Returns all MasterScore records sorted by numeric value (with "E" treated as 0).
-    """
     all_scores = MasterScore.query.all()
     def convert_score(score_str):
         s = score_str.strip()
@@ -172,7 +159,7 @@ def edit_competitor(competitor_id):
 
 @app.route("/refresh")
 def refresh():
-    scraped = force_refresh_leaderboard()  # Force a fresh scrape and update the cache
+    scraped = force_refresh_leaderboard()
     update_master_scores(scraped)
     return redirect(url_for("index"))
 
@@ -186,12 +173,12 @@ def api_competition():
 
 @app.route("/api/full")
 def api_full():
-    # Optionally force a refresh if cache is expired.
-    # (Note: The cache variables are maintained in scraper.py.)
+    if time.time() - get_leaderboard_mapping_cached().get('_last_scrape', 0) > CACHE_DURATION:
+        scraped = force_refresh_leaderboard()
+        update_master_scores(scraped)
     full = get_full_masters_scoreboard()
     result = []
     for entry in full:
-        # Adjust last_updated time to UTC+1.
         adjusted_time = entry.last_updated + timedelta(hours=1)
         result.append({
             "golfer": entry.golfer,
@@ -202,5 +189,5 @@ def api_full():
 
 if __name__ == "__main__":
     with app.app_context():
-        db.create_all()  # Create database tables if they don't exist.
+        db.create_all()
     app.run(debug=True)
