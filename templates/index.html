@@ -30,7 +30,6 @@
     .header-buttons {
       text-align: center;
       margin-bottom: 20px;
-      padding:16px;
     }
     
     .header-buttons button {
@@ -102,7 +101,7 @@
       justify-content: center;
     }
     
-    /* Desktop layout: two columns with content-fitted backgrounds */
+    /* Desktop layout: two columns with backgrounds that fit content */
     .column {
       background-color: #1E2C26;
       padding: 20px;
@@ -112,15 +111,13 @@
       margin-bottom: 20px;
     }
     
-    /* On larger screens, set proportions. Adjust as needed. */
+    /* Desktop proportions */
     .column.player {
       flex: 2 1 0;
-      /* Allow content to define width */
     }
     
     .column.full {
       flex: 1 1 0;
-      /* Remove any max-width so background fits content */
     }
     
     /* Table Styling */
@@ -195,31 +192,23 @@
       .container {
         flex-direction: column;
       }
-    
-      body {
-      font-family: 'Open Sans', sans-serif;
-      background: #0D1B17;
-      color: #FFFFFF;
-      padding: 20px;
-      width:fit-content;
-    }
       
       .column {
         width: 100%;
-        padding: 10px; /* Reduce padding on mobile */
+        padding: 10px; /* Reduced padding */
       }
       
       table th, table td {
         padding: 8px;
-        font-size: 0.7em; /* Reduce text size in tables */
+        font-size: 0.8em;  /* Slightly reduced font size */
       }
       
       h1 {
-        font-size: 1.5em;
+        font-size: 1.8em;
       }
       
       h2 {
-        font-size: 1.2em;
+        font-size: 1.4em;
       }
       
       .player-name, .combined-score {
@@ -263,6 +252,8 @@
         data.forEach(function(entry) {
           let row = "<tr><td>" + entry.golfer + "</td>" +
                     "<td>" + entry.current_score + "</td>" +
+                    "<td>" + entry.today + "</td>" +
+                    "<td>" + entry.thru + "</td>" +
                     "<td>" + entry.last_updated + "</td></tr>";
           tbody.innerHTML += row;
         });
@@ -371,6 +362,8 @@
           <tr>
             <th>Golfer</th>
             <th>Score</th>
+            <th>Today</th>
+            <th>Thru</th>
             <th>Last Updated (UTC+1)</th>
           </tr>
         </thead>
@@ -379,6 +372,8 @@
             <tr>
               <td>{{ entry.golfer }}</td>
               <td>{{ entry.current_score }}</td>
+              <td>{{ entry.today }}</td>
+              <td>{{ entry.thru }}</td>
               <td>{{ (entry.last_updated + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S") }}</td>
             </tr>
           {% endfor %}
