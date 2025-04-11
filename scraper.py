@@ -5,6 +5,7 @@ import uuid
 import time
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -33,16 +34,19 @@ def get_leaderboard_data():
     user_data_dir = tempfile.mkdtemp(prefix=unique_prefix)
     chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
     
-    # Get the Chrome binary location from the environment, if available.
+    # Set Chrome binary location from environment (if available)
     chrome_bin = os.environ.get("GOOGLE_CHROME_BIN")
     if chrome_bin:
         chrome_options.binary_location = chrome_bin
-    
+
     # Get the ChromeDriver path from the environment.
     chrome_driver_path = os.environ.get("CHROMEDRIVER_PATH")
     
+    # Create a Service object for ChromeDriver
+    service = ChromeService(executable_path=chrome_driver_path)
+    
     try:
-        driver = webdriver.Chrome(options=chrome_options, executable_path=chrome_driver_path)
+        driver = webdriver.Chrome(service=service, options=chrome_options)
     except Exception as e:
         print("Error creating Chrome driver:", e)
         shutil.rmtree(user_data_dir)
