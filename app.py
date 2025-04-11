@@ -1,22 +1,21 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
-from scraper import get_leaderboard_mapping_cached, force_refresh_leaderboard
+from scraper import get_leaderboard_mapping_cached, force_refresh_leaderboard, CACHE_DURATION
 from datetime import datetime, timedelta
 import time
 
 app = Flask(__name__)
-# Configure SQLite database (stored in competitors.db)
+# Configure the SQLite database (stored in competitors.db)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///competitors.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# Expose timedelta to Jinja for UTC+1 conversion
+# Expose timedelta to Jinja templates for UTC+1 time adjustment
 app.jinja_env.globals['timedelta'] = timedelta
 
 # ----------------------
 # Database Models
 # ----------------------
-
 class Competitor(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -42,9 +41,8 @@ class MasterScoreHistory(db.Model):
 # ----------------------
 # Helper Functions
 # ----------------------
-
 def update_master_scores(scraped, now=None):
-    """Updates the MasterScore records based on scraped data, logging changes in history."""
+    """Update MasterScore records and log changes to history."""
     if now is None:
         now = datetime.utcnow()
     for entry in scraped:
@@ -53,10 +51,9 @@ def update_master_scores(scraped, now=None):
         record = MasterScore.query.filter_by(golfer=golfer).first()
         if record:
             if record.current_score != new_score:
-                history = MasterScoreHistory(
-                    master_score_id=record.id,
-                    score=record.current_score,
-                    timestamp=record.last_updated)
+                history = MasterScoreHistory(master_score_id=record.id,
+                                             score=record.current_score,
+                                             timestamp=record.last_updated)
                 db.session.add(history)
             record.current_score = new_score
             record.last_updated = now
@@ -67,13 +64,9 @@ def update_master_scores(scraped, now=None):
 
 def generate_scoreboard():
     """
-    For each competitor stored in the database, look up current scores for
-    their selected golfers using the (cached) scraped ESPN data.
-    Returns a list of dictionaries with player data.
-    The score is formatted:
-      - 0 is shown as "E"
-      - Positive scores are prepended with "+"
-    The list is sorted in ascending order based on numeric total.
+    For each competitor, look up their selected golfers' scores using the cached data.
+    Returns a list of dictionaries with competitor data and a formatted total score.
+    Sorted in ascending order based on numeric total.
     """
     leaderboard_mapping = get_leaderboard_mapping_cached()  # {golfer: score, ...}
     scoreboard = []
@@ -106,12 +99,11 @@ def generate_scoreboard():
             "total": total_score_display,
             "total_numeric": total_score_num
         })
-    # Sort by numeric total (lowest first)
     scoreboard.sort(key=lambda x: x["total_numeric"])
     return scoreboard
 
 def get_full_masters_scoreboard():
-    """Returns all MasterScore records sorted by numeric value (with 'E' treated as 0)."""
+    """Returns all MasterScore records sorted by numeric value (treating 'E' as 0)."""
     all_scores = MasterScore.query.all()
     def convert_score(score_str):
         s = score_str.strip()
@@ -120,13 +112,12 @@ def get_full_masters_scoreboard():
         try:
             return int(s)
         except ValueError:
-            return 9999  # push unparseable values to the bottom
+            return 9999
     return sorted(all_scores, key=lambda rec: convert_score(rec.current_score))
 
 # ----------------------
 # Routes
 # ----------------------
-
 @app.route("/")
 def index():
     competition_scoreboard = generate_scoreboard()
@@ -163,10 +154,8 @@ def edit_competitor(competitor_id):
     competitor = Competitor.query.get(competitor_id)
     if not competitor:
         return redirect(url_for("index"))
-    
     leaderboard_mapping = get_leaderboard_mapping_cached()
     available_golfers = sorted(leaderboard_mapping.keys())
-
     if request.method == "POST":
         competitor.name = request.form.get("name")
         competitor.golfer1 = request.form.get("golfer1")
@@ -174,13 +163,11 @@ def edit_competitor(competitor_id):
         competitor.golfer3 = request.form.get("golfer3")
         db.session.commit()
         return redirect(url_for("index"))
-    
     return render_template("edit_competitor.html", competitor=competitor, available_golfers=available_golfers)
 
 @app.route("/refresh")
 def refresh():
-    """Refresh the full Masters scoreboard by scraping ESPN and updating scores."""
-    scraped = force_refresh_leaderboard()  # Forces fresh data and updates cache
+    scraped = force_refresh_leaderboard()  # Force a fresh scrape and update cache
     update_master_scores(scraped)
     return redirect(url_for("index"))
 
@@ -194,14 +181,14 @@ def api_competition():
 
 @app.route("/api/full")
 def api_full():
-    # Optionally, if cache is expired you might force a refresh here.
-    if time.time() - get_leaderboard_mapping_cached().get('_last_scrape', 0) > 600:
+    # Optionally force a refresh if the cache is expired.
+    if time.time() - get_leaderboard_mapping_cached().get('_last_scrape', 0) > CACHE_DURATION:
         scraped = force_refresh_leaderboard()
         update_master_scores(scraped)
     full = get_full_masters_scoreboard()
     result = []
     for entry in full:
-        # Adjust last_updated to UTC+1
+        # Adjust the last_updated time to UTC+1
         adjusted_time = entry.last_updated + timedelta(hours=1)
         result.append({
             "golfer": entry.golfer,
@@ -212,5 +199,5 @@ def api_full():
 
 if __name__ == "__main__":
     with app.app_context():
-        db.create_all()  # Create tables if they don't exist
+        db.create_all()
     app.run(debug=True)
