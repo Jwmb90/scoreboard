@@ -33,8 +33,11 @@ def get_leaderboard_data():
     user_data_dir = tempfile.mkdtemp(prefix=unique_prefix)
     chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
     
-    # Use the environment variables from Heroku buildpacks.
-    chrome_options.binary_location = os.environ.get("GOOGLE_CHROME_BIN")
+    # Set Chrome binary location if provided by the environment variable.
+    chrome_bin = os.environ.get("GOOGLE_CHROME_BIN")
+    if chrome_bin:
+        chrome_options.binary_location = chrome_bin
+    # Get the ChromeDriver path from the environment variable.
     chrome_driver_path = os.environ.get("CHROMEDRIVER_PATH")
     
     try:
@@ -74,7 +77,7 @@ def get_leaderboard_data():
     shutil.rmtree(user_data_dir)  # Clean up the temporary directory
     
     leaderboard = []
-    # Parse the player rows.
+    # Parse player rows.
     player_rows = soup.select("tbody.Table__TBODY tr.PlayerRow__Overview")
     for row in player_rows:
         name_anchor = row.select_one("a.AnchorLink.leaderboard_player_name")
@@ -89,7 +92,7 @@ def get_leaderboard_data():
 def get_leaderboard_mapping_cached():
     """
     Returns a dictionary mapping player names to scores using a cache.
-    The cache is refreshed if older than CACHE_DURATION.
+    Refreshes the cache if older than CACHE_DURATION.
     """
     global _cached_mapping, _last_scrape
     current_time = time.time()
