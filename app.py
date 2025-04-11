@@ -10,7 +10,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///competitors.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# Expose timedelta to Jinja templates for adjusting time to UTC+1
+# Expose timedelta to Jinja templates for UTC+1 time adjustment
 app.jinja_env.globals['timedelta'] = timedelta
 
 # ----------------------
@@ -30,6 +30,8 @@ class MasterScore(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     golfer = db.Column(db.String(100), nullable=False, unique=True)
     current_score = db.Column(db.String(20), nullable=False)
+    today = db.Column(db.String(20), nullable=True)
+    thru = db.Column(db.String(20), nullable=True)
     last_updated = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 class MasterScoreHistory(db.Model):
@@ -48,29 +50,34 @@ def update_master_scores(scraped, now=None):
     for entry in scraped:
         golfer = entry["player"]
         new_score = entry["score"]
+        new_today = entry.get("today", "N/A")
+        new_thru = entry.get("thru", "N/A")
         record = MasterScore.query.filter_by(golfer=golfer).first()
         if record:
-            if record.current_score != new_score:
-                history = MasterScoreHistory(
-                    master_score_id=record.id,
-                    score=record.current_score,
-                    timestamp=record.last_updated
-                )
+            if record.current_score != new_score or record.today != new_today or record.thru != new_thru:
+                history = MasterScoreHistory(master_score_id=record.id,
+                                             score=record.current_score,
+                                             timestamp=record.last_updated)
                 db.session.add(history)
             record.current_score = new_score
+            record.today = new_today
+            record.thru = new_thru
             record.last_updated = now
         else:
-            new_record = MasterScore(golfer=golfer, current_score=new_score, last_updated=now)
+            new_record = MasterScore(golfer=golfer, current_score=new_score,
+                                     today=new_today, thru=new_thru,
+                                     last_updated=now)
             db.session.add(new_record)
     db.session.commit()
 
 def generate_scoreboard():
     """
-    For each competitor, look up their selected golfers' scores using the cached data.
-    Returns a list of dictionaries with competitor data and a formatted total score.
-    Sorted in ascending order based on the numeric total.
+    For each competitor, look up their selected golfers' scores using cached data.
+    Returns a list of dictionaries for the competition scoreboard.
+    (Here, we only display the overall score; adjust if needed.)
+    Sorted in ascending order based on numeric total.
     """
-    leaderboard_mapping = get_leaderboard_mapping_cached()  # {golfer: score, ...}
+    leaderboard_mapping = get_leaderboard_mapping_cached()  # {golfer: {"score":..., "today":..., "thru":...}, ...}
     scoreboard = []
     competitors = Competitor.query.all()
     for comp in competitors:
@@ -78,7 +85,8 @@ def generate_scoreboard():
         scores = {}
         total_score_num = 0
         for golfer in golfers:
-            score_str = leaderboard_mapping.get(golfer, "N/A")
+            # Only using overall score for competition scoreboard
+            score_str = leaderboard_mapping.get(golfer, {}).get("score", "N/A")
             try:
                 score_val = int(score_str)
             except ValueError:
@@ -105,7 +113,7 @@ def generate_scoreboard():
     return scoreboard
 
 def get_full_masters_scoreboard():
-    """Returns all MasterScore records sorted by numeric value (with 'E' treated as 0)."""
+    """Returns all MasterScore records sorted by numeric value (treating 'E' as 0)."""
     all_scores = MasterScore.query.all()
     def convert_score(score_str):
         s = score_str.strip()
@@ -114,7 +122,7 @@ def get_full_masters_scoreboard():
         try:
             return int(s)
         except ValueError:
-            return 9999  # push unparseable values to the bottom
+            return 9999
     return sorted(all_scores, key=lambda rec: convert_score(rec.current_score))
 
 # ----------------------
@@ -183,18 +191,19 @@ def api_competition():
 
 @app.route("/api/full")
 def api_full():
-    # Optionally force a refresh if cache is expired.
+    # Optionally, force a refresh if the cache is expired.
     if time.time() - get_leaderboard_mapping_cached().get('_last_scrape', 0) > CACHE_DURATION:
         scraped = force_refresh_leaderboard()
         update_master_scores(scraped)
     full = get_full_masters_scoreboard()
     result = []
     for entry in full:
-        # Adjust last_updated to UTC+1
         adjusted_time = entry.last_updated + timedelta(hours=1)
         result.append({
             "golfer": entry.golfer,
             "current_score": entry.current_score,
+            "today": entry.today,
+            "thru": entry.thru,
             "last_updated": adjusted_time.strftime("%Y-%m-%d %H:%M:%S")
         })
     return jsonify(result)
