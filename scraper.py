@@ -20,7 +20,6 @@ def get_leaderboard_data():
     """
     Uses Selenium and BeautifulSoup to scrape ESPN Golf Leaderboard.
     Returns a list of dictionaries with keys 'player' and 'score'.
-    If the page fails to load, returns an empty list.
     """
     chrome_options = Options()
     chrome_options.add_argument("--headless")
@@ -28,16 +27,13 @@ def get_leaderboard_data():
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
     
-    # Create a unique temporary directory for Chrome's user-data-dir using uuid
+    # Create a unique temporary directory for Chrome's user-data-dir
     unique_prefix = "chrome-data-" + str(uuid.uuid4()) + "-"
     user_data_dir = tempfile.mkdtemp(prefix=unique_prefix)
     chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
     
-    # Set Chrome binary location if provided by the environment variable.
-    chrome_bin = os.environ.get("GOOGLE_CHROME_BIN")
-    if chrome_bin:
-        chrome_options.binary_location = chrome_bin
-    # Get the ChromeDriver path from the environment variable.
+    # Set binary and driver paths using Heroku environment variables.
+    chrome_options.binary_location = os.environ.get("GOOGLE_CHROME_BIN")
     chrome_driver_path = os.environ.get("CHROMEDRIVER_PATH")
     
     try:
@@ -52,8 +48,8 @@ def get_leaderboard_data():
     
     try:
         driver.get(url)
-    except TimeoutException as te:
-        print("Page load timed out:", te)
+    except Exception as e:
+        print("Page load error:", e)
         driver.quit()
         shutil.rmtree(user_data_dir)
         return []
@@ -62,37 +58,37 @@ def get_leaderboard_data():
         WebDriverWait(driver, 30).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "tbody.Table__TBODY"))
         )
-    except TimeoutException as te:
-        print("Timeout waiting for table body:", te)
+    except Exception as e:
+        print("Timeout waiting for table body:", e)
         driver.quit()
         shutil.rmtree(user_data_dir)
         return []
     
-    time.sleep(2)  # Extra wait time if needed
-    
+    time.sleep(2)
     html = driver.page_source
     soup = BeautifulSoup(html, "html.parser")
-    
     driver.quit()
-    shutil.rmtree(user_data_dir)  # Clean up the temporary directory
+    shutil.rmtree(user_data_dir)
     
     leaderboard = []
-    # Parse player rows.
-    player_rows = soup.select("tbody.Table__TBODY tr.PlayerRow__Overview")
+    # Use a generic selector for table rows; adjust as needed
+    player_rows = soup.select("tbody.Table__TBODY tr")
     for row in player_rows:
-        name_anchor = row.select_one("a.AnchorLink.leaderboard_player_name")
+        name_anchor = row.find("a")
         if name_anchor:
             player_name = name_anchor.get_text(strip=True)
             name_td = name_anchor.find_parent("td")
-            score_td = name_td.find_next_sibling("td")
+            score_td = name_td.find_next_sibling("td") if name_td else None
             score = score_td.get_text(strip=True) if score_td else "N/A"
             leaderboard.append({"player": player_name, "score": score})
+    
+    print("Found", len(leaderboard), "players.")
     return leaderboard
 
 def get_leaderboard_mapping_cached():
     """
-    Returns a dictionary mapping player names to scores using a cache.
-    Refreshes the cache if older than CACHE_DURATION.
+    Returns a cached mapping of player names to scores.
+    Refreshes the cache if it's older than CACHE_DURATION.
     """
     global _cached_mapping, _last_scrape
     current_time = time.time()
