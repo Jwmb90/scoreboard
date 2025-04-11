@@ -18,7 +18,6 @@
       font-family: 'Open Sans', sans-serif;
       background: #0D1B17;
       color: #FFFFFF;
-      line-height: 1.6;
       padding: 20px;
     }
     
@@ -34,8 +33,8 @@
     }
     
     .header-buttons button {
-      background-color: #004225; /* deep green */
-      color: #DAA520; /* gold accent */
+      background-color: #004225;
+      color: #DAA520;
       border: none;
       padding: 12px 20px;
       font-size: 16px;
@@ -49,7 +48,7 @@
       background-color: #00341e;
     }
     
-    /* Add Player Form Toggle */
+    /* Add Player Form */
     #addPlayerForm {
       background-color: #1E2C26;
       border: 1px solid #004225;
@@ -94,7 +93,7 @@
       background-color: #00341e;
     }
     
-    /* Responsive Container Layout */
+    /* Responsive Layout */
     .container {
       display: flex;
       flex-wrap: wrap;
@@ -102,25 +101,25 @@
       justify-content: center;
     }
     
-    /* Desktop layout: two columns */
+    /* Desktop layout: two columns with content-fitted backgrounds */
     .column {
       background-color: #1E2C26;
       padding: 20px;
       border: 1px solid #004225;
       border-radius: 6px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
       margin-bottom: 20px;
     }
     
-    /* Desktop proportions: 2/3 for players, 1/3 for masters */
+    /* On larger screens, set proportions. Adjust as needed. */
     .column.player {
       flex: 2 1 0;
-      min-width: 300px;
+      /* Allow content to define width */
     }
     
     .column.full {
       flex: 1 1 0;
-      min-width: 250px;
+      /* Remove any max-width so background fits content */
     }
     
     /* Table Styling */
@@ -148,7 +147,7 @@
       background-color: #1e3933;
     }
     
-    /* Typography Adjustments */
+    /* Typography */
     .player-name {
       font-size: 1.3em;
       font-weight: 700;
@@ -159,7 +158,7 @@
       font-weight: 700;
     }
     
-    /* Action Links & Forms */
+    /* Action Links */
     a {
       color: #DAA520;
       text-decoration: none;
@@ -190,13 +189,32 @@
       background-color: #00341e;
     }
     
-    /* Mobile adjustments */
+    /* Mobile Adjustments */
     @media (max-width: 768px) {
       .container {
         flex-direction: column;
       }
+      
       .column {
         width: 100%;
+        padding: 10px; /* Reduce padding on mobile */
+      }
+      
+      table th, table td {
+        padding: 8px;
+        font-size: 0.9em; /* Reduce text size in tables */
+      }
+      
+      h1 {
+        font-size: 1.8em;
+      }
+      
+      h2 {
+        font-size: 1.4em;
+      }
+      
+      .player-name, .combined-score {
+        font-size: 1.1em;
       }
     }
   </style>
