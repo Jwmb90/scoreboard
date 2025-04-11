@@ -1,3 +1,4 @@
+# scraper.py
 import os
 import tempfile
 import shutil
@@ -21,7 +22,7 @@ def get_leaderboard_data():
     """
     Uses Selenium and BeautifulSoup to scrape ESPN Golf Leaderboard.
     Returns a list of dictionaries with keys 'player' and 'score'.
-    If the page fails to load, returns an empty list.
+    If the page fails, returns an empty list.
     """
     chrome_options = Options()
     chrome_options.add_argument("--headless")
@@ -34,15 +35,11 @@ def get_leaderboard_data():
     user_data_dir = tempfile.mkdtemp(prefix=unique_prefix)
     chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
     
-    # Set Chrome binary location from environment (if available)
+    # Set binary and driver paths from environment (provided by Heroku buildpacks)
     chrome_bin = os.environ.get("GOOGLE_CHROME_BIN")
     if chrome_bin:
         chrome_options.binary_location = chrome_bin
-
-    # Get the ChromeDriver path from the environment.
     chrome_driver_path = os.environ.get("CHROMEDRIVER_PATH")
-    
-    # Create a Service object for ChromeDriver
     service = ChromeService(executable_path=chrome_driver_path)
     
     try:
@@ -73,7 +70,7 @@ def get_leaderboard_data():
         shutil.rmtree(user_data_dir)
         return []
     
-    time.sleep(2)  # Extra wait time if needed
+    time.sleep(2)  # Extra wait time if necessary
     
     html = driver.page_source
     soup = BeautifulSoup(html, "html.parser")
@@ -81,7 +78,7 @@ def get_leaderboard_data():
     shutil.rmtree(user_data_dir)  # Clean up the temporary directory
     
     leaderboard = []
-    # Parse the player rows.
+    # Parse the rows (you may need to adjust these selectors based on ESPN's current HTML)
     player_rows = soup.select("tbody.Table__TBODY tr.PlayerRow__Overview")
     for row in player_rows:
         name_anchor = row.select_one("a.AnchorLink.leaderboard_player_name")
@@ -96,7 +93,7 @@ def get_leaderboard_data():
 def get_leaderboard_mapping_cached():
     """
     Returns a dictionary mapping player names to scores using a cache.
-    The cache is refreshed if older than CACHE_DURATION.
+    Refreshes the cache if older than CACHE_DURATION.
     """
     global _cached_mapping, _last_scrape
     current_time = time.time()
