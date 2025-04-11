@@ -11,12 +11,21 @@ def get_leaderboard_data():
     """
     Uses requests and BeautifulSoup to fetch and parse the ESPN Golf Leaderboard.
     Returns a list of dictionaries with keys 'player' and 'score'.
-    If there is an error, returns an empty list.
+    If an error occurs, returns an empty list.
     """
     url = "https://www.espn.com/golf/leaderboard"
     
+    # Set headers to mimic a regular browser
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/135.0.0.0 Safari/537.36"
+        )
+    }
+    
     try:
-        response = requests.get(url, timeout=30)
+        response = requests.get(url, headers=headers, timeout=30)
         response.raise_for_status()
     except Exception as e:
         print("Error fetching data with requests:", e)
@@ -26,25 +35,24 @@ def get_leaderboard_data():
     soup = BeautifulSoup(html, "html.parser")
     
     leaderboard = []
-    # You will need to inspect ESPN's current leaderboard page to adjust these selectors.
-    # Example selectors based on a typical structure might be as follows:
+    # Adjust these selectors based on ESPN's current HTML structure.
     player_rows = soup.select("tbody.Table__TBODY tr.PlayerRow__Overview")
     for row in player_rows:
-        # Look for the player name; adjust the selector as necessary
         name_anchor = row.select_one("a.AnchorLink.leaderboard_player_name")
         if name_anchor:
             player_name = name_anchor.get_text(strip=True)
-            # For the score, we assume it is in the next <td> after the player's <td>
+            # We assume the score is in the next <td> following the player's <td>
             name_td = name_anchor.find_parent("td")
             score_td = name_td.find_next_sibling("td")
             score = score_td.get_text(strip=True) if score_td else "N/A"
             leaderboard.append({"player": player_name, "score": score})
+    
     return leaderboard
 
 def get_leaderboard_mapping_cached():
     """
     Returns a dictionary mapping player names to scores using a cache.
-    Refreshes the cache if it's older than CACHE_DURATION.
+    Refreshes the cache if it is older than CACHE_DURATION.
     """
     global _cached_mapping, _last_scrape
     current_time = time.time()
@@ -56,7 +64,8 @@ def get_leaderboard_mapping_cached():
 
 def force_refresh_leaderboard():
     """
-    Forces a fresh scrape of leaderboard data, updates the cache, and returns the raw data.
+    Forces a fresh scrape of leaderboard data, updates the cache,
+    and returns the raw data.
     """
     global _cached_mapping, _last_scrape
     data = get_leaderboard_data()
