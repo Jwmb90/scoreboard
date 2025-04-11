@@ -10,7 +10,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///competitors.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# Expose timedelta to Jinja templates for UTC+1 time adjustment
+# Expose timedelta to Jinja templates for adjusting time to UTC+1
 app.jinja_env.globals['timedelta'] = timedelta
 
 # ----------------------
@@ -42,7 +42,7 @@ class MasterScoreHistory(db.Model):
 # Helper Functions
 # ----------------------
 def update_master_scores(scraped, now=None):
-    """Update MasterScore records and log changes to history."""
+    """Update MasterScore records and log changes in history."""
     if now is None:
         now = datetime.utcnow()
     for entry in scraped:
@@ -54,7 +54,8 @@ def update_master_scores(scraped, now=None):
                 history = MasterScoreHistory(
                     master_score_id=record.id,
                     score=record.current_score,
-                    timestamp=record.last_updated)
+                    timestamp=record.last_updated
+                )
                 db.session.add(history)
             record.current_score = new_score
             record.last_updated = now
@@ -66,8 +67,8 @@ def update_master_scores(scraped, now=None):
 def generate_scoreboard():
     """
     For each competitor, look up their selected golfers' scores using the cached data.
-    Returns a list of dictionaries with competitor data and formatted total score,
-    sorted in ascending order based on numeric total.
+    Returns a list of dictionaries with competitor data and a formatted total score.
+    Sorted in ascending order based on the numeric total.
     """
     leaderboard_mapping = get_leaderboard_mapping_cached()  # {golfer: score, ...}
     scoreboard = []
@@ -104,7 +105,7 @@ def generate_scoreboard():
     return scoreboard
 
 def get_full_masters_scoreboard():
-    """Returns all MasterScore records sorted by numeric value (treating 'E' as 0)."""
+    """Returns all MasterScore records sorted by numeric value (with 'E' treated as 0)."""
     all_scores = MasterScore.query.all()
     def convert_score(score_str):
         s = score_str.strip()
@@ -113,7 +114,7 @@ def get_full_masters_scoreboard():
         try:
             return int(s)
         except ValueError:
-            return 9999
+            return 9999  # push unparseable values to the bottom
     return sorted(all_scores, key=lambda rec: convert_score(rec.current_score))
 
 # ----------------------
@@ -182,7 +183,7 @@ def api_competition():
 
 @app.route("/api/full")
 def api_full():
-    # Optionally force a refresh if the cache is expired.
+    # Optionally force a refresh if cache is expired.
     if time.time() - get_leaderboard_mapping_cached().get('_last_scrape', 0) > CACHE_DURATION:
         scraped = force_refresh_leaderboard()
         update_master_scores(scraped)
